@@ -23,7 +23,7 @@ if [[ "arm64" == "$ARCH_NAME" || "aarch64" == "$ARCH_NAME" ]]; then
 fi
 
 # Cross packaging / resolution controls
-PIP_PLATFORM=""
+PIP_PLATFORM_ARGS=""
 RAW_PLATFORM=""    # raw value from -p, e.g. manylinux2014_x86_64
 PACKAGE_SUFFIX="offline"
 PRERELEASE_ALLOW=0
@@ -329,7 +329,8 @@ PY
 	echo "Step 3: Downloading dependencies"
 	echo "=========================================="
 	echo "Index URL: ${PIP_MIRROR_URL}"
-	[ -n "$PIP_PLATFORM" ] && echo "Platform: ${RAW_PLATFORM}"
+	[ -n "$PIP_PLATFORM_ARGS" ] && echo "Platform: ${RAW_PLATFORM}"
+	unset PIP_PLATFORM PIP_PYTHON_VERSION PIP_ABI PIP_IMPLEMENTATION
 
 	# mkdir -p ./wheels
 	# echo "Downloading wheels to ./wheels/..."
@@ -343,10 +344,10 @@ PY
 	echo "Downloading wheels to ./wheels/..."
 	
 	DOWNLOAD_OK=0
-	if [ -n "$PIP_PLATFORM" ]; then
+	if [ -n "$PIP_PLATFORM_ARGS" ]; then
 	    # Pass 1: strict target-platform download (wheels only)
 	    echo "Pass 1: strict download for platform '${RAW_PLATFORM}' (wheels only)..."
-	    ${PIP_CMD} download ${PIP_PLATFORM} --prefer-binary -r requirements.txt -d ./wheels \
+	    ${PIP_CMD} download ${PIP_PLATFORM_ARGS} --prefer-binary -r requirements.txt -d ./wheels \
 	        --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 	    if [[ $? -eq 0 ]]; then
 	        DOWNLOAD_OK=1
@@ -454,7 +455,7 @@ print_usage() {
 
 while getopts "p:s:R" opt; do
 	case "$opt" in
-		p) RAW_PLATFORM="${OPTARG}"; PIP_PLATFORM="--platform ${OPTARG} --only-binary=:all:" ;;
+		p) RAW_PLATFORM="${OPTARG}"; PIP_PLATFORM_ARGS="--platform ${OPTARG} --only-binary=:all:" ;;
 		s) PACKAGE_SUFFIX="${OPTARG}" ;;
 		R) PRERELEASE_ALLOW=1 ;;
 		*) print_usage; exit 1 ;;
