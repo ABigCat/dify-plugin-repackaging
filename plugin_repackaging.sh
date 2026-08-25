@@ -331,18 +331,55 @@ PY
 	echo "Index URL: ${PIP_MIRROR_URL}"
 	[ -n "$PIP_PLATFORM" ] && echo "Platform: ${RAW_PLATFORM}"
 
+	# mkdir -p ./wheels
+	# echo "Downloading wheels to ./wheels/..."
+	# ${PIP_CMD} download ${PIP_PLATFORM} --prefer-binary -r requirements.txt -d ./wheels \
+	# 	--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+	# if [[ $? -ne 0 ]]; then
+	# 	echo "✗ Error: Failed to download dependencies"
+	# 	exit 1
+	# fi
 	mkdir -p ./wheels
 	echo "Downloading wheels to ./wheels/..."
-	${PIP_CMD} download ${PIP_PLATFORM} --prefer-binary -r requirements.txt -d ./wheels \
-		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-	if [[ $? -ne 0 ]]; then
-		echo "✗ Error: Failed to download dependencies"
-		exit 1
+	
+	DOWNLOAD_OK=0
+	if [ -n "$PIP_PLATFORM" ]; then
+	    # Pass 1: strict target-platform download (wheels only)
+	    echo "Pass 1: strict download for platform '${RAW_PLATFORM}' (wheels only)..."
+	    ${PIP_CMD} download ${PIP_PLATFORM} --prefer-binary -r requirements.txt -d ./wheels \
+	        --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+	    if [[ $? -eq 0 ]]; then
+	        DOWNLOAD_OK=1
+	    else
+	        echo "⚠ Warning: strict platform download failed"
+	        echo "  Some dependencies have no wheel for platform '${RAW_PLATFORM}'"
+	        echo "  Falling back to unrestricted download (sdist allowed)..."
+	    fi
+	else
+	    ${PIP_CMD} download --prefer-binary -r requirements.txt -d ./wheels \
+	        --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+	    if [[ $? -eq 0 ]]; then
+	        DOWNLOAD_OK=1
+	    fi
 	fi
-
+	
+	if [ "$DOWNLOAD_OK" -ne 1 ]; then
+	    # Pass 2: fallback, no platform restriction, sdist allowed
+	    ${PIP_CMD} download --prefer-binary -r requirements.txt -d ./wheels \
+	        --index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+	    if [[ $? -ne 0 ]]; then
+	        echo "✗ Error: Failed to download dependencies"
+	        exit 1
+	    fi
+	    echo "⚠ Fallback download succeeded (some packages may be sdist / current-platform wheels)"
+	    echo "  Note: sdist packages require a compiler on the target machine"
+	fi
 	# Count downloaded wheels
 	WHEEL_COUNT=$(ls -1 ./wheels/*.whl 2>/dev/null | wc -l)
 	echo "✓ Downloaded $WHEEL_COUNT wheel packages"
+
+
+
 
 	# ============================================
 	# Step 4: Update requirements.txt for offline usage
